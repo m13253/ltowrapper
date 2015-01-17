@@ -1,0 +1,101 @@
+#!/bin/bash
+
+# The MIT License (MIT)
+#
+# Copyright (c) 2015 StarBrilliant <m13253@hotmail.com>
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+
+set -e
+
+print_help() {
+    cat<<EOM
+Usage: $0 [host-triple]
+
+EOM
+    exit
+}
+
+main() {
+    TRIPLE=
+    if [ "$#" -eq '1' ]
+    then
+        if [ "$1" != '--help' ]
+        then
+            TRIPLE="$1"-
+        else
+            print_help
+        fi
+    elif [ "$#" -gt 1 ]
+    then
+        print_help
+    fi
+    TEMPDIR="$(mktemp -d --tmpdir ltowrapper.XXXXXXXXXX)"
+    [ -z "$TEMPDIR" ] && exit 2
+    QUOTE_PATH="$(printf %q "$PATH")"
+    ARCHIVER=(ar nm ranlib)
+    for COMMAND in "${ARCHIVER[@]}"
+    do
+        REAL_COMMAND="$(printf %q "${TRIPLE}gcc-$COMMAND")"
+        for i in "$COMMAND" "$TRIPLE$COMMAND" "gcc-$COMMAND" "${TRIPLE}gcc-$COMMAND"
+        do
+            cat >"$TEMPDIR/$i" <<EOM
+#!/bin/bash
+
+PATH=$QUOTE_PATH exec $REAL_COMMAND "\$@"
+EOM
+            chmod +x "$TEMPDIR/$i"
+        done
+        echo "Created \"$TRIPLE$COMMAND\"" >&2
+    done
+    COMPILER=(cc c++ gcc g++)
+    for COMMAND in "${COMPILER[@]}"
+    do
+        REAL_COMMAND="$(printf %q "$TRIPLE$COMMAND")"
+        for i in "$COMMAND" "$TRIPLE$COMMAND"
+        do
+            cat >"$TEMPDIR/$i" <<EOM
+#!/bin/bash
+
+for i in "\$@"
+do
+    if [ "\$i" = '-fno-lto' ]
+    then
+        PATH=$QUOTE_PATH exec $REAL_COMMAND "\$@"
+        exit "\$?"
+    fi
+done
+PATH=$QUOTE_PATH exec $REAL_COMMAND -flto -fuse-linker-plugin "\$@"
+EOM
+            chmod +x "$TEMPDIR/$i"
+        done
+        echo "Created \"$TRIPLE$COMMAND\"" >&2
+    done
+    echo "Starting \"${SHELL:-bash}\" shell, type \"exit\" when you finish." >&2
+    PATH="$TEMPDIR:$PATH" \
+        AR="$TEMPDIR/${TRIPLE}gcc-ar" \
+        CC="$TEMPDIR/${TRIPLE}gcc" \
+        CXX="$TEMPDIR/${TRIPLE}g++" \
+        NM="$TEMPDIR/${TRIPLE}gcc-nm" \
+        RANLIB="$TEMPDIR/${TRIPLE}gcc-ranlib" \
+        "${SHELL:-bash}" -i
+    rm -rfv "$TEMPDIR"
+}
+
+main "$@"
