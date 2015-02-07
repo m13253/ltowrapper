@@ -34,16 +34,23 @@ EOM
 
 main() {
     TRIPLE=
-    if [ "$#" -eq '1' ]
+    if [ "$#" -ge '1' ]
     then
-        if [ "$1" != '--help' ]
+        if [ "$1" = '--help' ]
+        then
+            print_help
+        elif [ "$1" -a "$1" != '-' ]
         then
             TRIPLE="$1"-
-        else
-            print_help
         fi
-    elif [ "$#" -gt 1 ]
-    then
+        shift
+        if [ "$#" -ne 0 ]
+        then
+            CHILD_CMD=("$@")
+        else
+            CHILD_CMD=("${SHELL:-bash}" -i)
+        fi
+    else
         print_help
     fi
     TEMPDIR="$(mktemp -d --tmpdir ltowrapper.XXXXXXXXXX)"
@@ -58,7 +65,7 @@ main() {
             cat >"$TEMPDIR/$i" <<EOM
 #!/bin/bash
 
-PATH=$QUOTE_PATH exec $REAL_COMMAND "\$@"
+PATH=$QUOTE_PATH exec -- $REAL_COMMAND "\$@"
 EOM
             chmod +x "$TEMPDIR/$i"
         done
@@ -77,24 +84,27 @@ for i in "\$@"
 do
     if [ "\$i" = '-fno-lto' ]
     then
-        PATH=$QUOTE_PATH exec $REAL_COMMAND "\$@"
+        PATH=$QUOTE_PATH exec -- $REAL_COMMAND "\$@"
         exit "\$?"
     fi
 done
-PATH=$QUOTE_PATH exec $REAL_COMMAND -flto -fuse-linker-plugin "\$@"
+PATH=$QUOTE_PATH exec -- $REAL_COMMAND -flto -fuse-linker-plugin "\$@"
 EOM
             chmod +x "$TEMPDIR/$i"
         done
         echo "Created \"$TRIPLE$COMMAND\"" >&2
     done
-    echo "Starting \"${SHELL:-bash}\" shell, type \"exit\" when you finish." >&2
+    if [ "$#" -eq 0 ]
+    then
+        echo "Starting \"${CHILD_CMD[0]}\" shell, type \"exit\" when you finish." >&2
+    fi
     PATH="$TEMPDIR:$PATH" \
         AR="$TEMPDIR/${TRIPLE}gcc-ar" \
         CC="$TEMPDIR/${TRIPLE}gcc" \
         CXX="$TEMPDIR/${TRIPLE}g++" \
         NM="$TEMPDIR/${TRIPLE}gcc-nm" \
         RANLIB="$TEMPDIR/${TRIPLE}gcc-ranlib" \
-        "${SHELL:-bash}" -i
+        "${CHILD_CMD[@]}"
     rm -rfv "$TEMPDIR"
 }
 
