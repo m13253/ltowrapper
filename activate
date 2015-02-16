@@ -50,8 +50,6 @@ main() {
         else
             CHILD_CMD=("${SHELL:-bash}" -i)
         fi
-    else
-        print_help
     fi
     TEMPDIR="$(mktemp -d --tmpdir ltowrapper.XXXXXXXXXX)"
     [ -z "$TEMPDIR" ] && exit 2
