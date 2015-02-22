@@ -34,7 +34,7 @@ EOM
 
 main() {
     TRIPLE=
-    if [ "$#" -ge '1' ]
+    if [ "$#" -ge 1 ]
     then
         if [ "$1" = '--help' ]
         then
@@ -44,12 +44,12 @@ main() {
             TRIPLE="$1"-
         fi
         shift
-        if [ "$#" -ne 0 ]
-        then
-            CHILD_CMD=("$@")
-        else
-            CHILD_CMD=("${SHELL:-bash}" -i)
-        fi
+    fi
+    if [ "$#" -ne 0 ]
+    then
+        CHILD_CMD=("$@")
+    else
+        CHILD_CMD=("${SHELL:-bash}" -i)
     fi
     TEMPDIR="$(mktemp -d --tmpdir ltowrapper.XXXXXXXXXX)"
     [ -z "$TEMPDIR" ] && exit 2
