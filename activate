@@ -39,7 +39,7 @@ main() {
         if [ "$1" = '--help' ]
         then
             print_help
-        elif [ "$1" -a "$1" != '-' ]
+        elif [ -n "$1" -a "$1" != '-' ]
         then
             TRIPLE="$1"-
         fi
